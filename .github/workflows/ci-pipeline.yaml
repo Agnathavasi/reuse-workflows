@@ -1,0 +1,168 @@
+name: CI-Pipeline
+#ReUSable Workflow to be called from other workflow
+on: 
+  workflow_call:
+   secrets:
+     SONAR_TOKEN:
+       required: true
+     DOCKERHUB_USERNAME:
+       required: true
+     DOCKERHUB_TOKEN:
+       required: true    
+   
+jobs:
+  unit_test:
+    name: Running Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.1
+      - name: python setup
+        uses: actions/setup-python@v6.1.0
+        with:
+          python-version: '3.10'
+      - name: install dependencies
+        run: |
+         python -m pip install --upgrade pip
+         pip install -r requirements.txt
+      - name: Run Unit Tests
+        run: |
+          mkdir reports
+          pytest --junitxml=reports/juint-reports.xml --cov=. --cov-report=term-missing -v
+      - name: Upload Unit Test Report
+        uses: actions/upload-artifact@v5.0.0
+        with:
+          name: junit-reports 
+          path : reports/
+       
+  codeql:
+     name: code Ql Security Scan
+     runs-on: ubuntu-latest
+     permissions:
+       actions: read
+       contents: read
+       security-events: write
+     strategy:
+       matrix:
+         language: [ 'python']
+     steps:
+       - name: checkout
+         uses: actions/checkout@v5.0.0
+       - name: Initilize Codeql
+         uses: github/codeql-action/init@v3
+         with:
+          languages: ${{ matrix.language }}
+       - name: CodeQl Analaysis
+         uses: github/codeql-action/analyze@v3
+         with:
+           category: security
+  sonarqube:
+    name: SonarQube
+    runs-on: ubuntu-latest
+    needs: unit_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis 
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Download Unit Test Report
+        uses: actions/download-artifact@v5.0.0
+        with:
+          name: junit-reports
+          path : reports/
+     # - name: SonarQube Quality Gate
+     #   uses: SonarSource/sonarqube-quality-gate-action@v1.2.0
+     #   env:
+     #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  buildimage:
+     name: build image
+     runs-on: ubuntu-latest
+     needs: [ codeql,sonarqube]
+     if: success()
+     outputs: 
+      image-tags: ${{ steps.var.outputs.IMAGE_TAGS }}
+     steps:
+        - name: checkout
+          uses: actions/checkout@v6.0.1
+        - name: Setup Docker  buildx
+          uses: docker/setup-buildx-action@v3.0.0
+        - name: Generate Image Tags
+          id: var  
+          run: |
+            IMAGE_TAGS="${{ github.run_id }}-${GITHUB_SHA::7}"
+            echo "IMAGE_TAGS=$IMAGE_TAGS" >> $GITHUB_OUTPUT
+        - name: Build Image (No Push)
+          uses: docker/build-push-action@v5.0.0
+          with:
+            context: .
+            file: ./Dockerfile
+            push: false
+            load: true
+            tags: myprac:${{ steps.var.outputs.IMAGE_TAGS }}
+        - name: Save Docker Image
+          run: docker save myprac:${{ steps.var.outputs.IMAGE_TAGS }} -o myprac_app.tar
+        - name: Upload Docker Image
+          uses: actions/upload-artifact@v5.0.0
+          with:
+           name: myprac_app_image
+           path : myprac_app.tar
+  publishimagetodokcerhub:
+     name: Docker Image Publish
+     runs-on: ubuntu-latest
+     needs: buildimage
+     steps:
+       - name: Download the Image
+         uses: actions/download-artifact@v5.0.0
+         with:
+          name: myprac_app_image
+          path: .
+       -  name: Load the Docker Image
+          run: docker load -i myprac_app.tar
+       -  name: docker login
+          uses: docker/login-action@v3 # docker login -u username -p password
+          with:
+            username: ${{ secrets.DOCKERHUB_USERNAME }}
+            password: ${{ secrets.DOCKERHUB_TOKEN }}
+       - name: Docker Tag
+         run: |
+          IMAGE_TAG=${{ needs.buildimage.outputs.image-tags }}
+          docker image tag myprac:$IMAGE_TAG ${{ secrets.DOCKERHUB_USERNAME }}/app:$IMAGE_TAG
+       - name: Docker Image Push
+         run: |
+          IMAGE_TAG=${{ needs.buildimage.outputs.image-tags }}
+  publishimagetoghcr:
+     name: Docker Image Publish to ghcr
+     runs-on: ubuntu-latest
+     needs: buildimage
+     permissions:
+       packages: write
+       contents: read
+     steps:
+       - name: Download the Image
+         uses: actions/download-artifact@v5.0.0
+         with:
+          name: myprac_app_image
+          path: .
+       -  name: Load the Docker Image
+          run: docker load -i myprac_app.tar
+       -  name: ghcr login
+          uses: docker/login-action@v3 # docker login -u username -p password
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }} # Github automatically creates Token
+       - name: Docker Tag
+         run: |
+          IMAGE_TAG=${{ needs.buildimage.outputs.image-tags }}
+          OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"   
+          docker image tag myprac:$IMAGE_TAG ghcr.io/$OWNER/app:$IMAGE_TAG
+       - name: Docker Image Push
+         run: |
+          IMAGE_TAG=${{ needs.buildimage.outputs.image-tags }}
+          OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')" 
+          docker image push ghcr.io/$OWNER/app:$IMAGE_TAG
+          
+         
