@@ -21,7 +21,7 @@ on:
      run_buildimage:
       description: "To build docker image"
       required: false
-      default: false
+      default: true
       type: boolean
      run_publishimagetodokcerhub:
       description: "To publish docker image to docker hub"
@@ -43,6 +43,7 @@ on:
    
 jobs:
   unit_test:
+    if: $${{ inputs.run_unit_tests }}
     name: Running Unit Tests
     runs-on: ubuntu-latest
     steps:
@@ -67,6 +68,7 @@ jobs:
           path : reports/
        
   codeql:
+     if: $${{ inputs.run_codeql }}
      name: code Ql Security Scan
      runs-on: ubuntu-latest
      permissions:
@@ -88,6 +90,7 @@ jobs:
          with:
            category: security
   sonarqube:
+    if: $${{ inputs.run_sonarqube }}
     name: SonarQube
     runs-on: ubuntu-latest
     needs: unit_test
@@ -109,10 +112,10 @@ jobs:
      #   env:
      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   buildimage:
+     if: ${{  success()  && inputs.run_buildimage }}
      name: build image
      runs-on: ubuntu-latest
-     needs: [ codeql,sonarqube]
-     if: success()
+     needs: [ unit_test,codeql,sonarqube]
      outputs: 
       image-tags: ${{ steps.var.outputs.IMAGE_TAGS }}
      steps:
@@ -141,6 +144,7 @@ jobs:
            name: myprac_app_image
            path : myprac_app.tar
   publishimagetodokcerhub:
+     if: ${{ inputs.run_publishimagetodokcerhub }}
      name: Docker Image Publish
      runs-on: ubuntu-latest
      needs: buildimage
@@ -165,6 +169,7 @@ jobs:
          run: |
           IMAGE_TAG=${{ needs.buildimage.outputs.image-tags }}
   publishimagetoghcr:
+     if:  ${{ inputs.run_publishimagetoghcr }}
      name: Docker Image Publish to ghcr
      runs-on: ubuntu-latest
      needs: buildimage
