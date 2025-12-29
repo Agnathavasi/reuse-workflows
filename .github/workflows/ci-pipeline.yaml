@@ -2,6 +2,37 @@ name: CI-Pipeline
 #ReUSable Workflow to be called from other workflow
 on: 
   workflow_call:
+   inputs:
+     run_unit_tests:
+      description: "To Run Unit Test Cases"
+      required: false
+      default: true
+      type: boolean
+     run_codeql:
+      description: "To run codeql"
+      required: false
+      default: false
+      type: boolean
+     run_sonarqube:
+      description: "To run sonaranalaysis"
+      required: false
+      default: false
+      type: boolean
+     run_buildimage:
+      description: "To build docker image"
+      required: false
+      default: false
+      type: boolean
+     run_publishimagetodokcerhub:
+      description: "To publish docker image to docker hub"
+      required: false
+      default: false
+      type: boolean
+     run_publishimagetoghcr:
+      description: "To publish docker image to ghcr"
+      required: false
+      default: false
+      type: boolean
    secrets:
      SONAR_TOKEN:
        required: true
