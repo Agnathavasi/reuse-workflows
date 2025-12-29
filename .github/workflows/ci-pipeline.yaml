@@ -43,7 +43,7 @@ on:
    
 jobs:
   unit_test:
-    if: $${{ inputs.run_unit_tests }}
+    if: ${{ inputs.run_unit_tests }}
     name: Running Unit Tests
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +68,7 @@ jobs:
           path : reports/
        
   codeql:
-     if: $${{ inputs.run_codeql }}
+     if: ${{ inputs.run_codeql }}
      name: code Ql Security Scan
      runs-on: ubuntu-latest
      permissions:
@@ -90,7 +90,7 @@ jobs:
          with:
            category: security
   sonarqube:
-    if: $${{ inputs.run_sonarqube }}
+    if: ${{ inputs.run_sonarqube }}
     name: SonarQube
     runs-on: ubuntu-latest
     needs: unit_test
