@@ -7,7 +7,7 @@ on:
             description: 'Kubernates Namespce to deploy App'
             required: true
             type: string
-        IMAGE: 
+        IMAGENAME: 
             description: 'Kubernates Image name with out Tag'
             required: true
             type: string
