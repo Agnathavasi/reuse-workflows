@@ -19,6 +19,7 @@ jobs:
            APP_BASE_URL: ${{vars.APP_BASE_URL}}
          run: |
            mkdir -p reports
+           mkdir -p tests
            pytest tests/ --html=reports/selinium-report.html --self-contained-html
        - name: Upload Selinium test reports
          uses: actions/upload-artifact@v5.0.0
