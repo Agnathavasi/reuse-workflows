@@ -7,10 +7,6 @@ on:
             description: 'Kubernates Environment staging, production'
             required: true
             type: string
-        NAMESPACE: 
-            description: 'Kubernates Namespce to deploy App'
-            required: true
-            type: string
         IMAGENAME: 
             description: 'Kubernates Image name with out Tag'
             required: true
@@ -24,7 +20,7 @@ jobs:
    deploy:
      environment: ${{inputs.ENVIRONMENT}}
      env:
-       NAMESPACE: ${{ inputs.NAMESPACE }}
+       NAMESPACE: ${{ vars.NAMESPACE }}
      runs-on: arc-runner-set
      steps:
        - name: checkout
