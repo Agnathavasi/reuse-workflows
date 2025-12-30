@@ -1,0 +1,45 @@
+name: Selinium Test Pipeline with Reusable Workflow
+
+on:
+  workflow_call:
+    inputs:
+        ENVIRONMENT: 
+            description: 'Kubernates Environment staging, production'
+            required: true
+            type: string
+jobs:
+   Selinium-tests:
+     environment: ${{inputs.ENVIRONMENT}}
+     env:
+       APP_BASE_URL: ${{vars.APP_BASE_URL}}
+     runs-on: arc-runner-set
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v5
+       - name: Install Python
+         uses: actions/setup-python@v6
+         with:
+          python-version: '3.10'
+       - name: Install Google Chrome
+         run: |
+          sudo apt-get update -y
+          sudo apt-get install -y wget gnupg ca-certificates
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt update -y
+          sudo apt install google-chrome-stable -y
+       - name: Install Dependencies
+         run: |
+          pip install -r requirements-test.txt
+       - name: Run Selinum test
+         env:
+           APP_BASE_URL: ${{vars.APP_BASE_URL}}
+         run: |
+           mkdir -p reports
+           pytest tests/ --html=reports/selinium-report.html --self-contained-html
+       - name: Upload Selinium test reports
+         uses: actions/upload-artifact@v5.0.0
+         with:
+           name: selinium-test-report
+           path: reports/
+
