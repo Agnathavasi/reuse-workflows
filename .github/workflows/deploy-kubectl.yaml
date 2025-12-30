@@ -3,6 +3,10 @@ name: Deploy Pipeline with Reusable Workflow
 on:
   workflow_call:
     inputs:
+        ENVIRONMENT: 
+            description: 'Kubernates Environment staging, production'
+            required: true
+            type: string
         NAMESPACE: 
             description: 'Kubernates Namespce to deploy App'
             required: true
@@ -18,6 +22,7 @@ on:
 
 jobs:
    deploy:
+     environment: ${{inputs.ENVIRONMENT}}
      env:
        NAMESPACE: ${{ inputs.NAMESPACE }}
      runs-on: arc-runner-set
